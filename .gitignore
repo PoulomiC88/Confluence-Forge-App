@@ -1,0 +1,7 @@
+node_modules/
+static/node_modules/
+static/build/
+coverage/
+.env
+*.log
+.DS_Store

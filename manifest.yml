@@ -1,0 +1,26 @@
+modules:
+  confluence:macroPage:
+    - key: confiform-macro
+      title: ConfiForms
+      description: Create dynamic forms, store submissions, and create Jira issues from Confluence pages
+      resource: main
+      resolver:
+        function: resolver
+  function:
+    - key: resolver
+      handler: src/resolvers/index.handler
+resources:
+  - key: main
+    path: static
+permissions:
+  scopes:
+    - storage:app
+    - read:confluence-content.summary
+    - write:jira-work
+    - read:jira-user
+    - read:jira-work
+app:
+  runtime:
+    name: nodejs18.x
+  id: ari:cloud:ecosystem::app/confluence-forge-confiform
+  name: ConfiForms for Confluence
