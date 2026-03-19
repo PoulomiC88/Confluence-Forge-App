@@ -1,4 +1,5 @@
 const api = require('@forge/api');
+const { route } = require('@forge/api');
 
 /**
  * Jira Service - Handles all Jira API interactions
@@ -15,8 +16,9 @@ async function validateAssignee(accountId) {
   }
 
   try {
+    const trimmedId = accountId.trim();
     const response = await api.asApp().requestJira(
-      `/rest/api/3/user?accountId=${encodeURIComponent(accountId.trim())}`,
+      route`/rest/api/3/user?accountId=${trimmedId}`,
       {
         method: 'GET',
         headers: {
@@ -104,7 +106,7 @@ async function createIssue({ projectKey, summary, assigneeAccountId, issueType =
   }
 
   try {
-    const response = await api.asApp().requestJira('/rest/api/3/issue', {
+    const response = await api.asApp().requestJira(route`/rest/api/3/issue`, {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -153,8 +155,9 @@ async function searchUsers(query) {
   }
 
   try {
+    const trimmedQuery = query.trim();
     const response = await api.asApp().requestJira(
-      `/rest/api/3/user/search?query=${encodeURIComponent(query.trim())}&maxResults=10`,
+      route`/rest/api/3/user/search?query=${trimmedQuery}&maxResults=10`,
       {
         method: 'GET',
         headers: {
@@ -189,7 +192,7 @@ async function searchUsers(query) {
  */
 async function getProjects() {
   try {
-    const response = await api.asApp().requestJira('/rest/api/3/project/search?maxResults=50', {
+    const response = await api.asApp().requestJira(route`/rest/api/3/project/search?maxResults=50`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',

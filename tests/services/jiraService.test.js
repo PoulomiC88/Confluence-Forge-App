@@ -2,6 +2,7 @@
 const mockRequestJira = jest.fn();
 jest.mock('@forge/api', () => ({
   fetch: jest.fn(),
+  route: (strings, ...values) => strings.reduce((result, str, i) => result + str + (values[i] != null ? encodeURIComponent(values[i]) : ''), ''),
   asApp: () => ({
     requestJira: mockRequestJira,
   }),
@@ -40,7 +41,7 @@ describe('jiraService', () => {
       expect(result.valid).toBe(true);
       expect(result.user).toEqual(mockUser);
       expect(mockRequestJira).toHaveBeenCalledWith(
-        '/rest/api/3/user?accountId=123',
+        expect.stringContaining('/rest/api/3/user?accountId=123'),
         expect.objectContaining({ method: 'GET' })
       );
     });
@@ -128,7 +129,7 @@ describe('jiraService', () => {
       expect(result.issueId).toBe('10001');
 
       expect(mockRequestJira).toHaveBeenCalledWith(
-        '/rest/api/3/issue',
+        expect.stringContaining('/rest/api/3/issue'),
         expect.objectContaining({
           method: 'POST',
           body: expect.stringContaining('"summary":"Test Issue"'),
