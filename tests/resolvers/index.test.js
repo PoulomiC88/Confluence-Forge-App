@@ -27,14 +27,14 @@ jest.mock('../../src/services/storageService', () => mockStorageService);
 
 // Mock @forge/resolver
 const mockResolverHandlers = {};
-jest.mock('@forge/resolver', () => {
-  return jest.fn().mockImplementation(() => ({
+jest.mock('@forge/resolver', () => ({
+  default: jest.fn().mockImplementation(() => ({
     define: jest.fn((name, handler) => {
       mockResolverHandlers[name] = handler;
     }),
     getDefinitions: jest.fn(() => mockResolverHandlers),
-  }));
-});
+  })),
+}));
 
 // Import the module (triggers resolver.define calls)
 require('../../src/resolvers/index');

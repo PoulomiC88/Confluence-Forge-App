@@ -25,7 +25,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
   const handleUserSearch = async (fieldName, query) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...(prev[fieldName] || defaultPickerState), query } }));
-    setFieldValues({ ...fieldValues, [fieldName]: query });
+    setFieldValues((prev) => ({ ...prev, [fieldName]: query }));
 
     if (searchTimeoutRef.current[fieldName]) {
       clearTimeout(searchTimeoutRef.current[fieldName]);
@@ -50,12 +50,12 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
   const handleSelectUser = (fieldName, user) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: user, showDropdown: false } }));
-    setFieldValues({ ...fieldValues, [fieldName]: user.accountId });
+    setFieldValues((prev) => ({ ...prev, [fieldName]: user.accountId }));
   };
 
   const handleClearUser = (fieldName) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: null, showDropdown: false } }));
-    setFieldValues({ ...fieldValues, [fieldName]: '' });
+    setFieldValues((prev) => ({ ...prev, [fieldName]: '' }));
   };
 
   const validate = () => {
@@ -119,9 +119,9 @@ function FormRenderer({ form, onBack, onSuccess }) {
   };
 
   const handleFieldChange = (fieldName, value) => {
-    setFieldValues({ ...fieldValues, [fieldName]: value });
+    setFieldValues((prev) => ({ ...prev, [fieldName]: value }));
     if (fieldErrors[fieldName]) {
-      setFieldErrors({ ...fieldErrors, [fieldName]: null });
+      setFieldErrors((prev) => ({ ...prev, [fieldName]: null }));
     }
   };
 

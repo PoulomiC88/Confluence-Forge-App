@@ -1,4 +1,4 @@
-const Resolver = require('@forge/resolver');
+const Resolver = require('@forge/resolver').default;
 const { v4: uuidv4 } = require('uuid');
 const jiraService = require('../services/jiraService');
 const storageService = require('../services/storageService');
