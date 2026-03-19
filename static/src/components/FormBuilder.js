@@ -39,7 +39,7 @@ function FormBuilder({ form, onSave, onCancel }) {
       }
       const fieldNames = fields.map((f) => f.name);
       if (!fieldNames.includes('summary')) {
-        errs.fields = 'A field named "summary" is required when Jira integration is enabled';
+        errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'A field named "summary" is required when Jira integration is enabled';
       }
       if (!fieldNames.includes('assignee')) {
         errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'A field named "assignee" is required when Jira integration is enabled';

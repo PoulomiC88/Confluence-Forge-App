@@ -26,6 +26,9 @@ function FormRenderer({ form, onBack, onSuccess }) {
   const handleUserSearch = async (fieldName, query) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...(prev[fieldName] || defaultPickerState), query } }));
     setFieldValues((prev) => ({ ...prev, [fieldName]: query }));
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => ({ ...prev, [fieldName]: null }));
+    }
 
     if (searchTimeoutRef.current[fieldName]) {
       clearTimeout(searchTimeoutRef.current[fieldName]);
@@ -51,11 +54,17 @@ function FormRenderer({ form, onBack, onSuccess }) {
   const handleSelectUser = (fieldName, user) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: user, showDropdown: false } }));
     setFieldValues((prev) => ({ ...prev, [fieldName]: { accountId: user.accountId, displayName: user.displayName } }));
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => ({ ...prev, [fieldName]: null }));
+    }
   };
 
   const handleClearUser = (fieldName) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: null, showDropdown: false } }));
     setFieldValues((prev) => ({ ...prev, [fieldName]: '' }));
+    if (fieldErrors[fieldName]) {
+      setFieldErrors((prev) => ({ ...prev, [fieldName]: null }));
+    }
   };
 
   const validate = () => {
@@ -201,7 +210,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
             {pickerState.selectedUser ? (
               <div className="user-selected">
                 {pickerState.selectedUser.avatarUrl && (
-                  <img src={pickerState.selectedUser.avatarUrl} alt="" className="user-avatar" />
+                  <img src={pickerState.selectedUser.avatarUrl} alt="" className="user-avatar" width={24} height={24} />
                 )}
                 <span>{pickerState.selectedUser.displayName}</span>
                 <button className="clear-user" onClick={() => handleClearUser(field.name)} title="Clear selection">×</button>
