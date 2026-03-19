@@ -216,7 +216,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
                       <div
                         key={user.accountId}
                         className="user-picker-item"
-                        onClick={() => handleSelectUser(field.name, user)}
+                        onMouseDown={(e) => { e.preventDefault(); handleSelectUser(field.name, user); }}
                       >
                         {user.avatarUrl && (
                           <img src={user.avatarUrl} alt="" className="user-avatar" />
