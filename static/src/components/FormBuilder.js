@@ -33,8 +33,17 @@ function FormBuilder({ form, onSave, onCancel }) {
     const errs = {};
     if (!title.trim()) errs.title = 'Form title is required';
     if (fields.length === 0) errs.fields = 'At least one field is required';
-    if (settings.enableJira && !settings.projectKey?.trim()) {
-      errs.projectKey = 'Project key is required when Jira integration is enabled';
+    if (settings.enableJira) {
+      if (!settings.projectKey?.trim()) {
+        errs.projectKey = 'Project key is required when Jira integration is enabled';
+      }
+      const fieldNames = fields.map((f) => f.name);
+      if (!fieldNames.includes('summary')) {
+        errs.fields = 'A field named "summary" is required when Jira integration is enabled';
+      }
+      if (!fieldNames.includes('assignee')) {
+        errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'A field named "assignee" is required when Jira integration is enabled';
+      }
     }
 
     // Validate field names are unique
