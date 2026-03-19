@@ -202,6 +202,26 @@ describe('jiraService', () => {
       expect(result.error).toContain('User does not exist');
     });
 
+    it('should extract errorMessages when errors object is empty', async () => {
+      mockRequestJira.mockResolvedValue({
+        ok: false,
+        status: 403,
+        text: async () => JSON.stringify({
+          errors: {},
+          errorMessages: ['Permission denied'],
+        }),
+      });
+
+      const result = await jiraService.createIssue({
+        projectKey: 'PROJ',
+        summary: 'Test',
+        assigneeAccountId: 'user-123',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Permission denied');
+    });
+
     it('should handle Jira API errors with errorMessages array', async () => {
       mockRequestJira.mockResolvedValue({
         ok: false,

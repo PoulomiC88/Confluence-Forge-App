@@ -145,8 +145,11 @@ resolver.define('submitForm', async ({ payload, context }) => {
 
     // Validate required fields
     for (const field of form.fields) {
-      if (field.required && (fieldValues[field.name] === undefined || fieldValues[field.name] === null || fieldValues[field.name].toString().trim() === '')) {
-        return { success: false, error: `Field "${field.label || field.name}" is required` };
+      if (field.required) {
+        const value = fieldValues[field.name];
+        if (value === undefined || value === null || (field.type === 'checkbox' ? value === false : value.toString().trim() === '')) {
+          return { success: false, error: `Field "${field.label || field.name}" is required` };
+        }
       }
     }
 

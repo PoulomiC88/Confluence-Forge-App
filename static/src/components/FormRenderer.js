@@ -8,12 +8,9 @@ function FormRenderer({ form, onBack, onSuccess }) {
   const [jiraIssueKey, setJiraIssueKey] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // User picker state
-  const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [userSearchResults, setUserSearchResults] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const searchTimeoutRef = useRef(null);
+  // User picker state (per-field to support multiple user_picker fields)
+  const [userPickerState, setUserPickerState] = useState({});
+  const searchTimeoutRef = useRef({});
 
   useEffect(() => {
     // Initialize field values
@@ -24,26 +21,26 @@ function FormRenderer({ form, onBack, onSuccess }) {
     setFieldValues(initial);
   }, [form]);
 
-  const handleUserSearch = async (query) => {
-    setUserSearchQuery(query);
-    setFieldValues({ ...fieldValues, assignee: query });
+  const getUserPickerState = (fieldName) => userPickerState[fieldName] || { query: '', results: [], selectedUser: null, showDropdown: false };
 
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
+  const handleUserSearch = async (fieldName, query) => {
+    setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...getUserPickerState(fieldName), query } }));
+    setFieldValues({ ...fieldValues, [fieldName]: query });
+
+    if (searchTimeoutRef.current[fieldName]) {
+      clearTimeout(searchTimeoutRef.current[fieldName]);
     }
 
     if (query.length < 2) {
-      setUserSearchResults([]);
-      setShowUserDropdown(false);
+      setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...getUserPickerState(fieldName), query, results: [], showDropdown: false } }));
       return;
     }
 
-    searchTimeoutRef.current = setTimeout(async () => {
+    searchTimeoutRef.current[fieldName] = setTimeout(async () => {
       try {
         const result = await invoke('searchJiraUsers', { query });
         if (result.success) {
-          setUserSearchResults(result.users);
-          setShowUserDropdown(true);
+          setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...prev[fieldName], results: result.users, showDropdown: true } }));
         }
       } catch (err) {
         console.error('User search failed:', err);
@@ -51,17 +48,14 @@ function FormRenderer({ form, onBack, onSuccess }) {
     }, 300);
   };
 
-  const handleSelectUser = (user) => {
-    setSelectedUser(user);
-    setFieldValues({ ...fieldValues, assignee: user.accountId });
-    setUserSearchQuery('');
-    setShowUserDropdown(false);
+  const handleSelectUser = (fieldName, user) => {
+    setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: user, showDropdown: false } }));
+    setFieldValues({ ...fieldValues, [fieldName]: user.accountId });
   };
 
-  const handleClearUser = () => {
-    setSelectedUser(null);
-    setFieldValues({ ...fieldValues, assignee: '' });
-    setUserSearchQuery('');
+  const handleClearUser = (fieldName) => {
+    setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: null, showDropdown: false } }));
+    setFieldValues({ ...fieldValues, [fieldName]: '' });
   };
 
   const validate = () => {
@@ -69,7 +63,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
     form.fields.forEach((field) => {
       if (field.required) {
         const value = fieldValues[field.name];
-        if (value === undefined || value === null || value.toString().trim() === '') {
+        if (value === undefined || value === null || (field.type === 'checkbox' ? value === false : value.toString().trim() === '')) {
           errs[field.name] = `${field.label || field.name} is required`;
         }
       }
@@ -113,7 +107,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
           initial[field.name] = field.type === 'checkbox' ? false : '';
         });
         setFieldValues(initial);
-        setSelectedUser(null);
+        setUserPickerState({});
       } else {
         setError(result.error || 'Submission failed');
       }
@@ -190,38 +184,39 @@ function FormRenderer({ form, onBack, onSuccess }) {
           </div>
         );
 
-      case 'user_picker':
+      case 'user_picker': {
+        const pickerState = getUserPickerState(field.name);
         return (
           <div className="form-group" key={field.name}>
             <label htmlFor={field.name}>
               {field.label} {field.required && <span style={{ color: '#de350b' }}>*</span>}
             </label>
-            {selectedUser ? (
+            {pickerState.selectedUser ? (
               <div className="user-selected">
-                {selectedUser.avatarUrl && (
-                  <img src={selectedUser.avatarUrl} alt="" className="user-avatar" />
+                {pickerState.selectedUser.avatarUrl && (
+                  <img src={pickerState.selectedUser.avatarUrl} alt="" className="user-avatar" />
                 )}
-                <span>{selectedUser.displayName}</span>
-                <button className="clear-user" onClick={handleClearUser} title="Clear selection">×</button>
+                <span>{pickerState.selectedUser.displayName}</span>
+                <button className="clear-user" onClick={() => handleClearUser(field.name)} title="Clear selection">×</button>
               </div>
             ) : (
               <div className="user-picker">
                 <input
                   id={field.name}
                   type="text"
-                  value={userSearchQuery}
-                  onChange={(e) => handleUserSearch(e.target.value)}
-                  onBlur={() => setTimeout(() => setShowUserDropdown(false), 200)}
+                  value={pickerState.query}
+                  onChange={(e) => handleUserSearch(field.name, e.target.value)}
+                  onBlur={() => setTimeout(() => setUserPickerState((prev) => ({ ...prev, [field.name]: { ...prev[field.name], showDropdown: false } })), 200)}
                   placeholder="Search for a user or enter account ID..."
                   className={fieldError ? 'error' : ''}
                 />
-                {showUserDropdown && userSearchResults.length > 0 && (
+                {pickerState.showDropdown && pickerState.results.length > 0 && (
                   <div className="user-picker-results">
-                    {userSearchResults.map((user) => (
+                    {pickerState.results.map((user) => (
                       <div
                         key={user.accountId}
                         className="user-picker-item"
-                        onClick={() => handleSelectUser(user)}
+                        onClick={() => handleSelectUser(field.name, user)}
                       >
                         {user.avatarUrl && (
                           <img src={user.avatarUrl} alt="" className="user-avatar" />
@@ -242,6 +237,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
             {fieldError && <div className="error-text">{fieldError}</div>}
           </div>
         );
+      }
 
       default:
         return (

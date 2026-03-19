@@ -200,7 +200,30 @@ describe('Resolvers', () => {
       expect(result.error).toContain('Summary');
     });
 
-    it('should accept false for required checkbox fields', async () => {
+    it('should reject unchecked required checkbox fields', async () => {
+      const formWithCheckbox = {
+        ...mockForm,
+        fields: [
+          ...mockForm.fields,
+          { name: 'agree', type: 'checkbox', required: true, label: 'Agree' },
+        ],
+      };
+      mockStorageService.getForm.mockResolvedValue(formWithCheckbox);
+
+      const result = await mockResolverHandlers.submitForm({
+        payload: {
+          formId: 'form-1',
+          fieldValues: { summary: 'Test', assignee: 'user-1', agree: false },
+          createJiraIssue: false,
+        },
+        context: defaultContext,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toContain('Agree');
+    });
+
+    it('should accept false for non-required checkbox fields', async () => {
       const formWithCheckbox = {
         ...mockForm,
         fields: [

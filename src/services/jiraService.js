@@ -119,7 +119,7 @@ async function createIssue({ projectKey, summary, assigneeAccountId, issueType =
 
       try {
         const errorJson = JSON.parse(errorBody);
-        if (errorJson.errors) {
+        if (errorJson.errors && Object.keys(errorJson.errors).length > 0) {
           errorMessage = Object.values(errorJson.errors).join(', ');
         } else if (errorJson.errorMessages && errorJson.errorMessages.length > 0) {
           errorMessage = errorJson.errorMessages.join(', ');
