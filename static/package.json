@@ -2,6 +2,7 @@
   "name": "confiform-ui",
   "version": "1.0.0",
   "private": true,
+  "homepage": ".",
   "description": "Custom UI for ConfiForms Forge app",
   "scripts": {
     "start": "react-scripts start",

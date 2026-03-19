@@ -49,7 +49,7 @@ function FormBuilder({ form, onSave, onCancel }) {
     // Validate field names are unique
     const names = fields.map((f) => f.name);
     if (new Set(names).size !== names.length) {
-      errs.fields = 'Field names must be unique';
+      errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'Field names must be unique';
     }
 
     setErrors(errs);
