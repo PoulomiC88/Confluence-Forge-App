@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { invoke } from '@forge/bridge';
+import { invoke, router } from '@forge/bridge';
 
 function SubmissionsView({ form, onBack }) {
   const [submissions, setSubmissions] = useState([]);
@@ -89,14 +89,13 @@ function SubmissionsView({ form, onBack }) {
                 ))}
                 <td>
                   {sub.jiraIssueKey ? (
-                    <a
+                    <span
                       className="jira-link"
-                      href={`/browse/${sub.jiraIssueKey}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => router.open(`/browse/${sub.jiraIssueKey}`)}
                     >
                       {sub.jiraIssueKey}
-                    </a>
+                    </span>
                   ) : (
                     '-'
                   )}
@@ -134,14 +133,13 @@ function SubmissionsView({ form, onBack }) {
               <span className="timestamp">{formatDate(sub.timestamp)}</span>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 {sub.jiraIssueKey && (
-                  <a
+                  <span
                     className="jira-link"
-                    href={`/browse/${sub.jiraIssueKey}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => router.open(`/browse/${sub.jiraIssueKey}`)}
                   >
                     {sub.jiraIssueKey}
-                  </a>
+                  </span>
                 )}
                 <button
                   className="btn btn-danger btn-sm"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { invoke } from '@forge/bridge';
+import { invoke, router } from '@forge/bridge';
 
 function FormRenderer({ form, onBack, onSuccess }) {
   const [fieldValues, setFieldValues] = useState({});
@@ -21,10 +21,10 @@ function FormRenderer({ form, onBack, onSuccess }) {
     setFieldValues(initial);
   }, [form]);
 
-  const getUserPickerState = (fieldName) => userPickerState[fieldName] || { query: '', results: [], selectedUser: null, showDropdown: false };
+  const defaultPickerState = { query: '', results: [], selectedUser: null, showDropdown: false };
 
   const handleUserSearch = async (fieldName, query) => {
-    setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...getUserPickerState(fieldName), query } }));
+    setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...(prev[fieldName] || defaultPickerState), query } }));
     setFieldValues({ ...fieldValues, [fieldName]: query });
 
     if (searchTimeoutRef.current[fieldName]) {
@@ -32,7 +32,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
     }
 
     if (query.length < 2) {
-      setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...getUserPickerState(fieldName), query, results: [], showDropdown: false } }));
+      setUserPickerState((prev) => ({ ...prev, [fieldName]: { ...(prev[fieldName] || defaultPickerState), query, results: [], showDropdown: false } }));
       return;
     }
 
@@ -185,7 +185,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
         );
 
       case 'user_picker': {
-        const pickerState = getUserPickerState(field.name);
+        const pickerState = userPickerState[field.name] || defaultPickerState;
         return (
           <div className="form-group" key={field.name}>
             <label htmlFor={field.name}>
@@ -247,7 +247,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
             </label>
             <input
               id={field.name}
-              type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : 'text'}
+              type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'date' ? 'date' : 'text'}
               value={value}
               onChange={(e) => handleFieldChange(field.name, e.target.value)}
               className={fieldError ? 'error' : ''}
@@ -277,14 +277,13 @@ function FormRenderer({ form, onBack, onSuccess }) {
       {jiraIssueKey && (
         <div className="jira-success">
           Issue created:{' '}
-          <a
+          <span
             className="jira-link"
-            href={`/browse/${jiraIssueKey}`}
-            target="_blank"
-            rel="noopener noreferrer"
+            style={{ cursor: 'pointer' }}
+            onClick={() => router.open(`/browse/${jiraIssueKey}`)}
           >
             {jiraIssueKey}
-          </a>
+          </span>
         </div>
       )}
 
