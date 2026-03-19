@@ -75,7 +75,7 @@ async function createIssue({ projectKey, summary, assigneeAccountId, issueType =
       name: issueType,
     },
     assignee: {
-      id: assigneeAccountId.trim(),
+      accountId: assigneeAccountId.trim(),
     },
   };
 

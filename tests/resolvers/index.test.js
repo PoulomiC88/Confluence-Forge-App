@@ -200,6 +200,29 @@ describe('Resolvers', () => {
       expect(result.error).toContain('Summary');
     });
 
+    it('should accept false for required checkbox fields', async () => {
+      const formWithCheckbox = {
+        ...mockForm,
+        fields: [
+          ...mockForm.fields,
+          { name: 'agree', type: 'checkbox', required: false, label: 'Agree' },
+        ],
+      };
+      mockStorageService.getForm.mockResolvedValue(formWithCheckbox);
+      mockStorageService.saveSubmission.mockResolvedValue();
+
+      const result = await mockResolverHandlers.submitForm({
+        payload: {
+          formId: 'form-1',
+          fieldValues: { summary: 'Test', assignee: 'user-1', agree: false },
+          createJiraIssue: false,
+        },
+        context: defaultContext,
+      });
+
+      expect(result.success).toBe(true);
+    });
+
     it('should return error when form not found', async () => {
       mockStorageService.getForm.mockResolvedValue(null);
 

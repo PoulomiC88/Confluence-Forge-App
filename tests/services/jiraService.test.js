@@ -134,6 +134,10 @@ describe('jiraService', () => {
           body: expect.stringContaining('"summary":"Test Issue"'),
         })
       );
+
+      // Verify assignee uses accountId (not id)
+      const callBody = JSON.parse(mockRequestJira.mock.calls[0][1].body);
+      expect(callBody.fields.assignee).toEqual({ accountId: 'user-123' });
     });
 
     it('should include description in ADF format when provided', async () => {

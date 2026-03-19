@@ -24,7 +24,7 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const result = await invoke('getFormsByPage', { pageId: 'current' });
+      const result = await invoke('getFormsByPage', {});
       if (result.success) {
         setForms(result.forms);
       } else {
@@ -50,10 +50,7 @@ function App() {
 
   const handleCreateForm = async (formData) => {
     try {
-      const result = await invoke('createForm', {
-        ...formData,
-        pageId: 'current',
-      });
+      const result = await invoke('createForm', formData);
       if (result.success) {
         setSuccessMessage('Form created successfully!');
         await loadForms();
@@ -86,7 +83,7 @@ function App() {
       return;
     }
     try {
-      const result = await invoke('deleteForm', { formId, pageId: 'current' });
+      const result = await invoke('deleteForm', { formId });
       if (result.success) {
         setSuccessMessage('Form deleted successfully!');
         await loadForms();

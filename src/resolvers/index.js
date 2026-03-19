@@ -108,10 +108,14 @@ resolver.define('updateForm', async ({ payload }) => {
  */
 resolver.define('deleteForm', async ({ payload }) => {
   try {
-    const { formId, pageId } = payload;
+    const { formId } = payload;
     if (!formId) {
       return { success: false, error: 'Form ID is required' };
     }
+
+    // Look up the form's pageId from storage for proper cleanup
+    const form = await storageService.getForm(formId);
+    const pageId = form ? form.pageId : null;
 
     await storageService.deleteForm(formId, pageId);
     return { success: true };
@@ -141,7 +145,7 @@ resolver.define('submitForm', async ({ payload, context }) => {
 
     // Validate required fields
     for (const field of form.fields) {
-      if (field.required && (!fieldValues[field.name] || fieldValues[field.name].toString().trim() === '')) {
+      if (field.required && (fieldValues[field.name] === undefined || fieldValues[field.name] === null || fieldValues[field.name].toString().trim() === '')) {
         return { success: false, error: `Field "${field.label || field.name}" is required` };
       }
     }
