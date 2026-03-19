@@ -564,6 +564,12 @@
   margin-top: 4px;
 }
 
+.user-selected .user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
 .user-selected .clear-user {
   background: none;
   border: none;

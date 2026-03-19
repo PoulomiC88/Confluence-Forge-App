@@ -147,7 +147,16 @@ resolver.define('submitForm', async ({ payload, context }) => {
     for (const field of form.fields) {
       if (field.required) {
         const value = fieldValues[field.name];
-        if (value === undefined || value === null || (field.type === 'checkbox' ? value === false : value.toString().trim() === '')) {
+        if (value === undefined || value === null) {
+          return { success: false, error: `Field "${field.label || field.name}" is required` };
+        }
+        // user_picker stores { accountId, displayName } — check accountId is present
+        if (field.type === 'user_picker') {
+          const acctId = typeof value === 'object' ? value.accountId : value;
+          if (!acctId || (typeof acctId === 'string' && acctId.trim() === '')) {
+            return { success: false, error: `Field "${field.label || field.name}" is required` };
+          }
+        } else if (field.type === 'checkbox' ? value === false : value.toString().trim() === '') {
           return { success: false, error: `Field "${field.label || field.name}" is required` };
         }
       }
@@ -167,13 +176,17 @@ resolver.define('submitForm', async ({ payload, context }) => {
     // Optionally create a Jira issue
     if (shouldCreateJira && projectKey) {
       const summary = fieldValues.summary;
-      const assignee = fieldValues.assignee;
+      const assigneeValue = fieldValues.assignee;
+      // user_picker fields store { accountId, displayName }; plain strings are also accepted
+      const assignee = typeof assigneeValue === 'object' && assigneeValue !== null
+        ? assigneeValue.accountId
+        : assigneeValue;
 
-      if (!summary || summary.trim() === '') {
+      if (!summary || (typeof summary === 'string' && summary.trim() === '')) {
         return { success: false, error: 'Summary is required for Jira issue creation' };
       }
 
-      if (!assignee || assignee.trim() === '') {
+      if (!assignee || (typeof assignee === 'string' && assignee.trim() === '')) {
         return { success: false, error: 'Assignee is required for Jira issue creation' };
       }
 
@@ -186,7 +199,7 @@ resolver.define('submitForm', async ({ payload, context }) => {
       // Create the Jira issue
       const jiraResult = await jiraService.createIssue({
         projectKey,
-        summary,
+        summary: typeof summary === 'string' ? summary : String(summary),
         assigneeAccountId: assignee,
       });
 

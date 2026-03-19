@@ -52,6 +52,16 @@ function SubmissionsView({ form, onBack }) {
     }
   };
 
+  const formatFieldValue = (field, value) => {
+    if (value === undefined || value === null) return '-';
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+    // user_picker fields store { accountId, displayName }
+    if (field.type === 'user_picker' && typeof value === 'object') {
+      return value.displayName || value.accountId || '-';
+    }
+    return value || '-';
+  };
+
   const renderTableView = () => {
     if (submissions.length === 0) {
       return (
@@ -60,8 +70,6 @@ function SubmissionsView({ form, onBack }) {
         </div>
       );
     }
-
-    const fieldNames = form.fields.map((f) => f.name);
 
     return (
       <div style={{ overflowX: 'auto' }}>
@@ -80,11 +88,9 @@ function SubmissionsView({ form, onBack }) {
             {submissions.map((sub) => (
               <tr key={sub.id}>
                 <td>{formatDate(sub.timestamp)}</td>
-                {fieldNames.map((name) => (
-                  <td key={name}>
-                    {typeof sub.fieldValues[name] === 'boolean'
-                      ? sub.fieldValues[name] ? 'Yes' : 'No'
-                      : sub.fieldValues[name] || '-'}
+                {form.fields.map((field) => (
+                  <td key={field.name}>
+                    {formatFieldValue(field, sub.fieldValues[field.name])}
                   </td>
                 ))}
                 <td>
@@ -153,9 +159,7 @@ function SubmissionsView({ form, onBack }) {
               <div key={field.name} className="submission-field">
                 <div className="field-label">{field.label}</div>
                 <div className="field-value">
-                  {typeof sub.fieldValues[field.name] === 'boolean'
-                    ? sub.fieldValues[field.name] ? 'Yes' : 'No'
-                    : sub.fieldValues[field.name] || '-'}
+                  {formatFieldValue(field, sub.fieldValues[field.name])}
                 </div>
               </div>
             ))}

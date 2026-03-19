@@ -50,7 +50,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
   const handleSelectUser = (fieldName, user) => {
     setUserPickerState((prev) => ({ ...prev, [fieldName]: { query: '', results: [], selectedUser: user, showDropdown: false } }));
-    setFieldValues((prev) => ({ ...prev, [fieldName]: user.accountId }));
+    setFieldValues((prev) => ({ ...prev, [fieldName]: { accountId: user.accountId, displayName: user.displayName } }));
   };
 
   const handleClearUser = (fieldName) => {
@@ -63,7 +63,14 @@ function FormRenderer({ form, onBack, onSuccess }) {
     form.fields.forEach((field) => {
       if (field.required) {
         const value = fieldValues[field.name];
-        if (value === undefined || value === null || (field.type === 'checkbox' ? value === false : value.toString().trim() === '')) {
+        if (value === undefined || value === null) {
+          errs[field.name] = `${field.label || field.name} is required`;
+        } else if (field.type === 'user_picker') {
+          const acctId = typeof value === 'object' ? value.accountId : value;
+          if (!acctId || (typeof acctId === 'string' && acctId.trim() === '')) {
+            errs[field.name] = `${field.label || field.name} is required`;
+          }
+        } else if (field.type === 'checkbox' ? value === false : value.toString().trim() === '') {
           errs[field.name] = `${field.label || field.name} is required`;
         }
       }
