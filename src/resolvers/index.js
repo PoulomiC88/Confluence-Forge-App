@@ -234,7 +234,17 @@ resolver.define('submitForm', async ({ payload, context }) => {
         if (!visible) continue;
         const val = fieldValues[cfDef.fieldId];
         if (val !== undefined && val !== null && val !== '') {
-          customFields[cfDef.fieldId] = cfDef.type === 'number' ? Number(val) : val;
+          // Format value based on field type to match Jira API expectations:
+          // - number: cast to Number
+          // - select: wrap in { value: "..." } object (Jira select list format)
+          // - text/textarea: pass as plain string
+          if (cfDef.type === 'number') {
+            customFields[cfDef.fieldId] = Number(val);
+          } else if (cfDef.type === 'select') {
+            customFields[cfDef.fieldId] = { value: val };
+          } else {
+            customFields[cfDef.fieldId] = val;
+          }
         }
       }
 
