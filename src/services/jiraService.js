@@ -109,9 +109,11 @@ async function createIssue({ projectKey, summary, assigneeAccountId, issueType =
   }
 
   // Merge dynamic custom fields (e.g., customfield_10010, customfield_10011)
-  // into the Jira payload. Values are expected to already match Jira's format.
+  // into the Jira payload. Only keys matching the customfield_ prefix are allowed
+  // to prevent overwriting standard Jira fields (project, summary, assignee, etc.).
   if (customFields && typeof customFields === 'object') {
     for (const [fieldId, value] of Object.entries(customFields)) {
+      if (!(/^customfield_\d+$/).test(fieldId)) continue;
       if (value !== undefined && value !== null && value !== '') {
         fields[fieldId] = value;
       }

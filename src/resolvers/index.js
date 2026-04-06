@@ -332,6 +332,21 @@ resolver.define('createJiraIssue', async ({ payload }) => {
       return { success: false, error: assigneeValidation.error };
     }
 
+    // Sanitize customFields: only allow keys matching customfield_NNNNN pattern
+    // to prevent overwriting standard Jira fields (project, summary, etc.).
+    let sanitizedCustomFields;
+    if (customFields && typeof customFields === 'object') {
+      sanitizedCustomFields = {};
+      for (const [key, val] of Object.entries(customFields)) {
+        if ((/^customfield_\d+$/).test(key)) {
+          sanitizedCustomFields[key] = val;
+        }
+      }
+      if (Object.keys(sanitizedCustomFields).length === 0) {
+        sanitizedCustomFields = undefined;
+      }
+    }
+
     // Create the issue with standard + custom fields
     const result = await jiraService.createIssue({
       projectKey,
@@ -340,7 +355,7 @@ resolver.define('createJiraIssue', async ({ payload }) => {
       issueType,
       description,
       priority,
-      customFields,
+      customFields: sanitizedCustomFields,
     });
 
     return result;
