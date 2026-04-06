@@ -228,7 +228,7 @@ resolver.define('submitForm', async ({ payload, context }) => {
       // Build custom fields map from JSON-configured fields for the Jira payload.
       // Only include fields that are currently visible (conditional logic).
       const customFields = {};
-      for (const cfDef of customFieldDefs) {
+      for (const cfDef of (Array.isArray(customFieldDefs) ? customFieldDefs : [])) {
         if (!cfDef.fieldId) continue;
         const visible = isFieldVisible(cfDef, fieldValues);
         if (!visible) continue;
