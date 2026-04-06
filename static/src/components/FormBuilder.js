@@ -467,6 +467,10 @@ function FormBuilder({ form, onSave, onCancel }) {
             })()}
           </div>
         )}
+        {/* Show validation error even when editor is collapsed */}
+        {!showJsonEditor && errors.customFields && (
+          <div className="error-text" style={{ marginTop: '4px' }}>{errors.customFields}</div>
+        )}
       </div>
 
       {/* Jira Settings */}
