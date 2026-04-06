@@ -147,8 +147,8 @@ function FormBuilder({ form, onSave, onCancel }) {
       errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'Field names must be unique';
     }
 
-    // Validate JSON custom fields config if the editor is open and has content
-    if (showJsonEditor && customFieldsJson.trim()) {
+    // Validate JSON custom fields config if content exists (regardless of editor visibility)
+    if (customFieldsJson.trim()) {
       try {
         const parsed = JSON.parse(customFieldsJson);
         const configErr = validateCustomFieldsConfig(parsed);
@@ -220,9 +220,9 @@ function FormBuilder({ form, onSave, onCancel }) {
   const handleSave = () => {
     if (!validate()) return;
 
-    // Parse custom fields config from JSON editor (graceful fallback to empty)
+    // Parse custom fields config (always persisted if content exists, regardless of editor visibility)
     let customFieldsConfig = [];
-    if (showJsonEditor && customFieldsJson.trim()) {
+    if (customFieldsJson.trim()) {
       try {
         customFieldsConfig = JSON.parse(customFieldsJson);
       } catch (_e) {
