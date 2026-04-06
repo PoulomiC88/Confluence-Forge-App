@@ -71,6 +71,10 @@ function validateCustomFieldsConfig(config) {
       return `Field at index ${i}: "fieldId" is required and must be a non-empty string`;
     }
 
+    if (!(/^customfield_\d+$/).test(field.fieldId)) {
+      return `Field "${field.fieldId}": "fieldId" must match the Jira custom field format (e.g., "customfield_10041")`;
+    }
+
     if (fieldIds.has(field.fieldId)) {
       return `Field at index ${i}: duplicate fieldId "${field.fieldId}"`;
     }
