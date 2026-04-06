@@ -51,9 +51,12 @@ async function validateAssignee(accountId) {
  * @param {string} [params.issueType="Task"] - Issue type name
  * @param {string} [params.description] - Optional issue description
  * @param {string} [params.priority] - Optional priority name
+ * @param {object} [params.customFields] - Optional map of custom field IDs to their values
+ *   (e.g., { "customfield_10010": 5, "customfield_10011": "Non-Functional" }).
+ *   Values are placed directly into the Jira issue payload.
  * @returns {Promise<{success: boolean, issueKey?: string, issueId?: string, error?: string}>}
  */
-async function createIssue({ projectKey, summary, assigneeAccountId, issueType = 'Task', description, priority }) {
+async function createIssue({ projectKey, summary, assigneeAccountId, issueType = 'Task', description, priority, customFields }) {
   // Validate required fields
   if (!projectKey || typeof projectKey !== 'string' || projectKey.trim() === '') {
     return { success: false, error: 'Project key is required' };
@@ -103,6 +106,16 @@ async function createIssue({ projectKey, summary, assigneeAccountId, issueType =
     fields.priority = {
       name: priority,
     };
+  }
+
+  // Merge dynamic custom fields (e.g., customfield_10010, customfield_10011)
+  // into the Jira payload. Values are expected to already match Jira's format.
+  if (customFields && typeof customFields === 'object') {
+    for (const [fieldId, value] of Object.entries(customFields)) {
+      if (value !== undefined && value !== null && value !== '') {
+        fields[fieldId] = value;
+      }
+    }
   }
 
   try {
