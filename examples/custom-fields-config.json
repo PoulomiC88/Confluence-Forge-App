@@ -1,24 +1,24 @@
 [
   {
-    "fieldId": "customfield_10010",
+    "fieldId": "customfield_10041",
     "label": "Story Points",
     "type": "number",
     "required": false
   },
   {
-    "fieldId": "customfield_10011",
+    "fieldId": "customfield_10077",
     "label": "Story Type",
     "type": "select",
     "options": ["Functional", "Non-Functional", "Maintenance"],
     "required": true
   },
   {
-    "fieldId": "customfield_10012",
+    "fieldId": "customfield_10076",
     "label": "Story Description",
     "type": "textarea",
     "required": true,
     "visibleWhen": {
-      "fieldId": "customfield_10011",
+      "fieldId": "customfield_10077",
       "equals": "Non-Functional"
     }
   }
