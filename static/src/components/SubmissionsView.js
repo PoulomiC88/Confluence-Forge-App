@@ -7,6 +7,17 @@ function SubmissionsView({ form, onBack }) {
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'list'
 
+  // Merge standard fields with JSON-configured custom fields for display columns
+  const customFieldDefs = form.settings?.customFieldsConfig || [];
+  const allFields = [
+    ...form.fields,
+    ...(Array.isArray(customFieldDefs) ? customFieldDefs.map((cf) => ({
+      name: cf.fieldId,
+      label: cf.label,
+      type: cf.type,
+    })) : []),
+  ];
+
   const loadSubmissions = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -77,7 +88,7 @@ function SubmissionsView({ form, onBack }) {
           <thead>
             <tr>
               <th>Date</th>
-              {form.fields.map((f) => (
+              {allFields.map((f) => (
                 <th key={f.name}>{f.label}</th>
               ))}
               <th>Jira Issue</th>
@@ -88,7 +99,7 @@ function SubmissionsView({ form, onBack }) {
             {submissions.map((sub) => (
               <tr key={sub.id}>
                 <td>{formatDate(sub.timestamp)}</td>
-                {form.fields.map((field) => (
+                {allFields.map((field) => (
                   <td key={field.name}>
                     {formatFieldValue(field, sub.fieldValues[field.name])}
                   </td>
@@ -155,7 +166,7 @@ function SubmissionsView({ form, onBack }) {
                 </button>
               </div>
             </div>
-            {form.fields.map((field) => (
+            {allFields.map((field) => (
               <div key={field.name} className="submission-field">
                 <div className="field-label">{field.label}</div>
                 <div className="field-value">

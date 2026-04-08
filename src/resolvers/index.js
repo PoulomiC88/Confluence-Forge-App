@@ -127,7 +127,23 @@ resolver.define('deleteForm', async ({ payload }) => {
 // ─── Submission Resolvers ─────────────────────────────────────────
 
 /**
+ * Determines whether a custom/dynamic field should be visible based on its
+ * conditional-visibility rule (visibleWhen) and the current field values.
+ * @param {object} field - A field definition that may contain a visibleWhen rule
+ * @param {object} fieldValues - Current map of fieldId/name → value
+ * @returns {boolean} true when the field should be visible (and therefore validated/sent)
+ */
+function isFieldVisible(field, fieldValues) {
+  if (!field.visibleWhen) return true;
+  const { fieldId: depField, equals } = field.visibleWhen;
+  if (!depField) return true;
+  return fieldValues[depField] === equals;
+}
+
+/**
  * Submits form data and optionally creates a Jira issue.
+ * Supports both standard fields and JSON-configured custom fields with
+ * conditional visibility logic.
  */
 resolver.define('submitForm', async ({ payload, context }) => {
   try {
@@ -143,21 +159,34 @@ resolver.define('submitForm', async ({ payload, context }) => {
       return { success: false, error: 'Form not found' };
     }
 
-    // Validate required fields
-    for (const field of form.fields) {
+    // Combine standard fields with any JSON-configured custom fields
+    const allFields = [...(form.fields || [])];
+    const customFieldDefs = form.settings?.customFieldsConfig || [];
+    if (Array.isArray(customFieldDefs)) {
+      allFields.push(...customFieldDefs);
+    }
+
+    // Validate required fields (respecting conditional visibility)
+    for (const field of allFields) {
+      const key = field.fieldId || field.name;
+      const visible = isFieldVisible(field, fieldValues);
+
+      // Skip validation for hidden conditional fields
+      if (!visible) continue;
+
       if (field.required) {
-        const value = fieldValues[field.name];
+        const value = fieldValues[key];
         if (value === undefined || value === null) {
-          return { success: false, error: `Field "${field.label || field.name}" is required` };
+          return { success: false, error: `Field "${field.label || key}" is required` };
         }
         // user_picker stores { accountId, displayName } — check accountId is present
         if (field.type === 'user_picker') {
           const acctId = typeof value === 'object' ? value.accountId : value;
           if (!acctId || (typeof acctId === 'string' && acctId.trim() === '')) {
-            return { success: false, error: `Field "${field.label || field.name}" is required` };
+            return { success: false, error: `Field "${field.label || key}" is required` };
           }
         } else if (field.type === 'checkbox' ? value === false : value.toString().trim() === '') {
-          return { success: false, error: `Field "${field.label || field.name}" is required` };
+          return { success: false, error: `Field "${field.label || key}" is required` };
         }
       }
     }
@@ -196,11 +225,35 @@ resolver.define('submitForm', async ({ payload, context }) => {
         return { success: false, error: `Invalid assignee: ${assigneeValidation.error}` };
       }
 
-      // Create the Jira issue
+      // Build custom fields map from JSON-configured fields for the Jira payload.
+      // Only include fields that are currently visible (conditional logic).
+      const customFields = {};
+      for (const cfDef of (Array.isArray(customFieldDefs) ? customFieldDefs : [])) {
+        if (!cfDef.fieldId) continue;
+        const visible = isFieldVisible(cfDef, fieldValues);
+        if (!visible) continue;
+        const val = fieldValues[cfDef.fieldId];
+        if (val !== undefined && val !== null && val !== '') {
+          // Format value based on field type to match Jira API expectations:
+          // - number: cast to Number
+          // - select: wrap in { value: "..." } object (Jira select list format)
+          // - text/textarea: pass as plain string
+          if (cfDef.type === 'number') {
+            customFields[cfDef.fieldId] = Number(val);
+          } else if (cfDef.type === 'select') {
+            customFields[cfDef.fieldId] = { value: val };
+          } else {
+            customFields[cfDef.fieldId] = val;
+          }
+        }
+      }
+
+      // Create the Jira issue with standard + custom fields
       const jiraResult = await jiraService.createIssue({
         projectKey,
         summary: typeof summary === 'string' ? summary : String(summary),
         assigneeAccountId: assignee,
+        customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
       });
 
       if (!jiraResult.success) {
@@ -264,10 +317,11 @@ resolver.define('deleteSubmission', async ({ payload }) => {
 /**
  * Creates a Jira issue directly from form data.
  * This is the standalone resolver for Jira issue creation.
+ * Supports an optional customFields map for dynamic field values.
  */
 resolver.define('createJiraIssue', async ({ payload }) => {
   try {
-    const { projectKey, summary, assigneeAccountId, issueType, description, priority } = payload;
+    const { projectKey, summary, assigneeAccountId, issueType, description, priority, customFields } = payload;
 
     // Validate required fields
     if (!projectKey || projectKey.trim() === '') {
@@ -288,7 +342,22 @@ resolver.define('createJiraIssue', async ({ payload }) => {
       return { success: false, error: assigneeValidation.error };
     }
 
-    // Create the issue
+    // Sanitize customFields: only allow keys matching customfield_NNNNN pattern
+    // to prevent overwriting standard Jira fields (project, summary, etc.).
+    let sanitizedCustomFields;
+    if (customFields && typeof customFields === 'object') {
+      sanitizedCustomFields = {};
+      for (const [key, val] of Object.entries(customFields)) {
+        if ((/^customfield_\d+$/).test(key)) {
+          sanitizedCustomFields[key] = val;
+        }
+      }
+      if (Object.keys(sanitizedCustomFields).length === 0) {
+        sanitizedCustomFields = undefined;
+      }
+    }
+
+    // Create the issue with standard + custom fields
     const result = await jiraService.createIssue({
       projectKey,
       summary,
@@ -296,6 +365,7 @@ resolver.define('createJiraIssue', async ({ payload }) => {
       issueType,
       description,
       priority,
+      customFields: sanitizedCustomFields,
     });
 
     return result;

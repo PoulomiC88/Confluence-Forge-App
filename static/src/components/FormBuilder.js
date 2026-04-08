@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 
+/**
+ * Supported field types for the standard (manual) field builder.
+ */
 const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
   { value: 'textarea', label: 'Text Area' },
@@ -16,6 +19,91 @@ const DEFAULT_FIELDS = [
   { name: 'assignee', label: 'Assignee', type: 'user_picker', required: true },
 ];
 
+/**
+ * Example JSON template that users can use as a starting point for
+ * defining dynamic custom fields (Story Points, Story Type, conditional
+ * Story Description).
+ */
+const EXAMPLE_JSON = `[
+  {
+    "fieldId": "customfield_10041",
+    "label": "Story Points",
+    "type": "number",
+    "required": false
+  },
+  {
+    "fieldId": "customfield_10077",
+    "label": "Story Type",
+    "type": "select",
+    "options": ["Functional", "Non-Functional", "Maintenance"],
+    "required": true
+  },
+  {
+    "fieldId": "customfield_10076",
+    "label": "Story Description",
+    "type": "textarea",
+    "required": true,
+    "visibleWhen": {
+      "fieldId": "customfield_10077",
+      "equals": "Non-Functional"
+    }
+  }
+]`;
+
+/**
+ * Validates a parsed JSON custom-fields configuration array.
+ * Returns an error string if invalid, or null if valid.
+ * @param {Array} config - The parsed JSON array
+ * @returns {string|null}
+ */
+function validateCustomFieldsConfig(config) {
+  if (!Array.isArray(config)) {
+    return 'Configuration must be a JSON array';
+  }
+
+  const allowedTypes = ['text', 'number', 'select', 'textarea'];
+  const fieldIds = new Set();
+
+  for (let i = 0; i < config.length; i++) {
+    const field = config[i];
+
+    if (!field.fieldId || typeof field.fieldId !== 'string' || field.fieldId.trim() === '') {
+      return `Field at index ${i}: "fieldId" is required and must be a non-empty string`;
+    }
+
+    if (!(/^customfield_\d+$/).test(field.fieldId)) {
+      return `Field "${field.fieldId}": "fieldId" must match the Jira custom field format (e.g., "customfield_10041")`;
+    }
+
+    if (fieldIds.has(field.fieldId)) {
+      return `Field at index ${i}: duplicate fieldId "${field.fieldId}"`;
+    }
+    fieldIds.add(field.fieldId);
+
+    if (!field.label || typeof field.label !== 'string' || field.label.trim() === '') {
+      return `Field "${field.fieldId}": "label" is required`;
+    }
+
+    if (!field.type || !allowedTypes.includes(field.type)) {
+      return `Field "${field.fieldId}": "type" must be one of: ${allowedTypes.join(', ')}`;
+    }
+
+    if (field.type === 'select') {
+      if (!field.options || !Array.isArray(field.options) || field.options.length === 0) {
+        return `Field "${field.fieldId}": "options" array is required for select type`;
+      }
+    }
+
+    if (field.visibleWhen) {
+      if (!field.visibleWhen.fieldId || !field.visibleWhen.equals) {
+        return `Field "${field.fieldId}": "visibleWhen" must have "fieldId" and "equals" properties`;
+      }
+    }
+  }
+
+  return null;
+}
+
 function FormBuilder({ form, onSave, onCancel }) {
   const [title, setTitle] = useState(form ? form.title : '');
   const [fields, setFields] = useState(form ? form.fields : [...DEFAULT_FIELDS]);
@@ -28,6 +116,17 @@ function FormBuilder({ form, onSave, onCancel }) {
   const [newFieldType, setNewFieldType] = useState('text');
   const [newFieldRequired, setNewFieldRequired] = useState(false);
   const [newFieldOptions, setNewFieldOptions] = useState('');
+
+  // JSON custom fields configuration state
+  const [customFieldsJson, setCustomFieldsJson] = useState(
+    form?.settings?.customFieldsConfig
+      ? JSON.stringify(form.settings.customFieldsConfig, null, 2)
+      : ''
+  );
+  const [jsonError, setJsonError] = useState(null);
+  const [showJsonEditor, setShowJsonEditor] = useState(
+    !!(form?.settings?.customFieldsConfig && form.settings.customFieldsConfig.length > 0)
+  );
 
   const validate = () => {
     const errs = {};
@@ -50,6 +149,19 @@ function FormBuilder({ form, onSave, onCancel }) {
     const names = fields.map((f) => f.name);
     if (new Set(names).size !== names.length) {
       errs.fields = (errs.fields ? errs.fields + '. ' : '') + 'Field names must be unique';
+    }
+
+    // Validate JSON custom fields config if content exists (regardless of editor visibility)
+    if (customFieldsJson.trim()) {
+      try {
+        const parsed = JSON.parse(customFieldsJson);
+        const configErr = validateCustomFieldsConfig(parsed);
+        if (configErr) {
+          errs.customFields = configErr;
+        }
+      } catch (e) {
+        errs.customFields = `Invalid JSON: ${e.message}`;
+      }
     }
 
     setErrors(errs);
@@ -90,13 +202,45 @@ function FormBuilder({ form, onSave, onCancel }) {
     setFields(newFields);
   };
 
+  /**
+   * Handles changes to the JSON configuration textarea.
+   * Performs live validation and clears errors on valid input.
+   */
+  const handleJsonChange = (value) => {
+    setCustomFieldsJson(value);
+    if (!value.trim()) {
+      setJsonError(null);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(value);
+      const err = validateCustomFieldsConfig(parsed);
+      setJsonError(err);
+    } catch (e) {
+      setJsonError(`Invalid JSON: ${e.message}`);
+    }
+  };
+
   const handleSave = () => {
     if (!validate()) return;
+
+    // Parse custom fields config (always persisted if content exists, regardless of editor visibility)
+    let customFieldsConfig = [];
+    if (customFieldsJson.trim()) {
+      try {
+        customFieldsConfig = JSON.parse(customFieldsJson);
+      } catch (_e) {
+        // Validation already catches this; fall back to empty
+      }
+    }
 
     const formData = {
       title: title.trim(),
       fields,
-      settings,
+      settings: {
+        ...settings,
+        customFieldsConfig,
+      },
     };
 
     if (form) {
@@ -229,6 +373,108 @@ function FormBuilder({ form, onSave, onCancel }) {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* JSON Custom Fields Configuration */}
+      <div className="form-section">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h3 style={{ margin: 0 }}>Custom Fields (JSON Config)</h3>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => setShowJsonEditor(!showJsonEditor)}
+          >
+            {showJsonEditor ? 'Hide JSON Editor' : 'Show JSON Editor'}
+          </button>
+        </div>
+        <p style={{ fontSize: '13px', color: '#6b778c', margin: '0 0 8px 0' }}>
+          Define additional Jira custom fields using JSON. These fields will appear in the form
+          and be mapped to Jira issue fields on submission. Supports conditional visibility.
+        </p>
+
+        {showJsonEditor && (
+          <div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setCustomFieldsJson(EXAMPLE_JSON);
+                  handleJsonChange(EXAMPLE_JSON);
+                }}
+                title="Load the example template with Story Points, Story Type, and conditional Story Description"
+              >
+                Load Example Template
+              </button>
+              {customFieldsJson.trim() && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => {
+                    setCustomFieldsJson('');
+                    setJsonError(null);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+            <textarea
+              value={customFieldsJson}
+              onChange={(e) => handleJsonChange(e.target.value)}
+              rows={12}
+              style={{
+                fontFamily: 'monospace',
+                fontSize: '12px',
+                width: '100%',
+                border: jsonError ? '2px solid #de350b' : '1px solid #dfe1e6',
+                borderRadius: '3px',
+                padding: '8px',
+                resize: 'vertical',
+              }}
+              placeholder='Paste or type your JSON configuration here...'
+            />
+            {jsonError && <div className="error-text" style={{ marginTop: '4px' }}>{jsonError}</div>}
+            {errors.customFields && <div className="error-text" style={{ marginTop: '4px' }}>{errors.customFields}</div>}
+            {!jsonError && customFieldsJson.trim() && (
+              <div style={{ marginTop: '4px', fontSize: '12px', color: '#00875a' }}>
+                JSON is valid
+              </div>
+            )}
+
+            {/* Preview of configured custom fields */}
+            {!jsonError && customFieldsJson.trim() && (() => {
+              try {
+                const parsed = JSON.parse(customFieldsJson);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  return (
+                    <div style={{ marginTop: '8px', padding: '8px', background: '#f4f5f7', borderRadius: '3px' }}>
+                      <h4 style={{ fontSize: '12px', color: '#6b778c', marginBottom: '4px' }}>
+                        Preview: {parsed.length} custom field{parsed.length > 1 ? 's' : ''} configured
+                      </h4>
+                      {parsed.map((f, i) => (
+                        <div key={i} style={{ fontSize: '12px', padding: '2px 0' }}>
+                          <strong>{f.label}</strong> ({f.type})
+                          {f.required && <span style={{ color: '#de350b' }}> *</span>}
+                          {f.visibleWhen && (
+                            <span style={{ color: '#6b778c' }}>
+                              {' '} &mdash; visible when {f.visibleWhen.fieldId} = &quot;{f.visibleWhen.equals}&quot;
+                            </span>
+                          )}
+                          <span style={{ color: '#6b778c' }}> [{f.fieldId}]</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+              } catch (_e) {
+                // Ignore parse errors here; they are shown above
+              }
+              return null;
+            })()}
+          </div>
+        )}
+        {/* Show validation error even when editor is collapsed */}
+        {!showJsonEditor && errors.customFields && (
+          <div className="error-text" style={{ marginTop: '4px' }}>{errors.customFields}</div>
+        )}
       </div>
 
       {/* Jira Settings */}

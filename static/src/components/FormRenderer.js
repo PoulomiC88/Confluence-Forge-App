@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { invoke, router } from '@forge/bridge';
 
+/**
+ * Evaluates whether a field should be visible based on its visibleWhen rule.
+ * Used for JSON-configured custom fields with conditional visibility.
+ * @param {object} field - Field definition (may contain visibleWhen)
+ * @param {object} fieldValues - Current values keyed by fieldId/name
+ * @returns {boolean}
+ */
+function isFieldVisible(field, fieldValues) {
+  if (!field.visibleWhen) return true;
+  const { fieldId: depField, equals } = field.visibleWhen;
+  if (!depField) return true;
+  return fieldValues[depField] === equals;
+}
+
 function FormRenderer({ form, onBack, onSuccess }) {
   const [fieldValues, setFieldValues] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -12,12 +26,25 @@ function FormRenderer({ form, onBack, onSuccess }) {
   const [userPickerState, setUserPickerState] = useState({});
   const searchTimeoutRef = useRef({});
 
+  // Merge standard fields with JSON-configured custom fields for rendering
+  const customFieldDefs = form.settings?.customFieldsConfig || [];
+  const allFields = [
+    ...form.fields,
+    ...(Array.isArray(customFieldDefs) ? customFieldDefs : []),
+  ];
+
   useEffect(() => {
-    // Initialize field values
+    // Initialize field values for both standard and custom fields
     const initial = {};
     form.fields.forEach((field) => {
       initial[field.name] = field.type === 'checkbox' ? false : '';
     });
+    const cfDefs = form.settings?.customFieldsConfig || [];
+    if (Array.isArray(cfDefs)) {
+      cfDefs.forEach((field) => {
+        initial[field.fieldId] = field.type === 'checkbox' ? false : '';
+      });
+    }
     setFieldValues(initial);
   }, [form]);
 
@@ -67,26 +94,35 @@ function FormRenderer({ form, onBack, onSuccess }) {
     }
   };
 
+  /**
+   * Validates all visible fields (standard + custom) before submission.
+   * Conditional fields that are hidden are skipped.
+   */
   const validate = () => {
     const errs = {};
-    form.fields.forEach((field) => {
+    allFields.forEach((field) => {
+      const key = field.fieldId || field.name;
+
+      // Skip validation for conditionally hidden fields
+      if (!isFieldVisible(field, fieldValues)) return;
+
       if (field.required) {
-        const value = fieldValues[field.name];
+        const value = fieldValues[key];
         if (value === undefined || value === null) {
-          errs[field.name] = `${field.label || field.name} is required`;
+          errs[key] = `${field.label || key} is required`;
         } else if (field.type === 'user_picker') {
           const acctId = typeof value === 'object' ? value.accountId : value;
           if (!acctId || (typeof acctId === 'string' && acctId.trim() === '')) {
-            errs[field.name] = `${field.label || field.name} is required`;
+            errs[key] = `${field.label || key} is required`;
           }
         } else if (field.type === 'checkbox' ? value === false : value.toString().trim() === '') {
-          errs[field.name] = `${field.label || field.name} is required`;
+          errs[key] = `${field.label || key} is required`;
         }
       }
-      if (field.type === 'email' && fieldValues[field.name]) {
+      if (field.type === 'email' && fieldValues[key]) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(fieldValues[field.name])) {
-          errs[field.name] = 'Please enter a valid email address';
+        if (!emailRegex.test(fieldValues[key])) {
+          errs[key] = 'Please enter a valid email address';
         }
       }
     });
@@ -102,9 +138,20 @@ function FormRenderer({ form, onBack, onSuccess }) {
     setJiraIssueKey(null);
 
     try {
+      // Build the submission payload, excluding values for hidden conditional fields
+      const submissionValues = { ...fieldValues };
+      const cfDefs = form.settings?.customFieldsConfig || [];
+      if (Array.isArray(cfDefs)) {
+        cfDefs.forEach((cfDef) => {
+          if (!isFieldVisible(cfDef, fieldValues)) {
+            delete submissionValues[cfDef.fieldId];
+          }
+        });
+      }
+
       const result = await invoke('submitForm', {
         formId: form.id,
-        fieldValues,
+        fieldValues: submissionValues,
         createJiraIssue: form.settings?.enableJira || false,
         projectKey: form.settings?.projectKey || '',
       });
@@ -117,11 +164,16 @@ function FormRenderer({ form, onBack, onSuccess }) {
           onSuccess('Form submitted successfully!');
         }
 
-        // Reset form
+        // Reset form (standard + custom fields)
         const initial = {};
         form.fields.forEach((field) => {
           initial[field.name] = field.type === 'checkbox' ? false : '';
         });
+        if (Array.isArray(cfDefs)) {
+          cfDefs.forEach((field) => {
+            initial[field.fieldId] = field.type === 'checkbox' ? false : '';
+          });
+        }
         setFieldValues(initial);
         setUserPickerState({});
       } else {
@@ -141,21 +193,27 @@ function FormRenderer({ form, onBack, onSuccess }) {
     }
   };
 
+  /**
+   * Renders a single form field. Supports both standard fields (keyed by name)
+   * and JSON-configured custom fields (keyed by fieldId). The fieldKey is the
+   * identifier used in fieldValues and fieldErrors maps.
+   */
   const renderField = (field) => {
-    const value = fieldValues[field.name] || '';
-    const fieldError = fieldErrors[field.name];
+    const fieldKey = field.fieldId || field.name;
+    const value = fieldValues[fieldKey] || '';
+    const fieldError = fieldErrors[fieldKey];
 
     switch (field.type) {
       case 'textarea':
         return (
-          <div className="form-group" key={field.name}>
-            <label htmlFor={field.name}>
+          <div className="form-group" key={fieldKey}>
+            <label htmlFor={fieldKey}>
               {field.label} {field.required && <span style={{ color: '#de350b' }}>*</span>}
             </label>
             <textarea
-              id={field.name}
+              id={fieldKey}
               value={value}
-              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
               rows={4}
               className={fieldError ? 'error' : ''}
             />
@@ -165,14 +223,14 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
       case 'select':
         return (
-          <div className="form-group" key={field.name}>
-            <label htmlFor={field.name}>
+          <div className="form-group" key={fieldKey}>
+            <label htmlFor={fieldKey}>
               {field.label} {field.required && <span style={{ color: '#de350b' }}>*</span>}
             </label>
             <select
-              id={field.name}
+              id={fieldKey}
               value={value}
-              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
               className={fieldError ? 'error' : ''}
             >
               <option value="">Select...</option>
@@ -186,25 +244,25 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
       case 'checkbox':
         return (
-          <div className="form-group" key={field.name}>
+          <div className="form-group" key={fieldKey}>
             <div className="checkbox-group">
               <input
                 type="checkbox"
-                id={field.name}
-                checked={!!fieldValues[field.name]}
-                onChange={(e) => handleFieldChange(field.name, e.target.checked)}
+                id={fieldKey}
+                checked={!!fieldValues[fieldKey]}
+                onChange={(e) => handleFieldChange(fieldKey, e.target.checked)}
               />
-              <label htmlFor={field.name}>{field.label}</label>
+              <label htmlFor={fieldKey}>{field.label}</label>
             </div>
             {fieldError && <div className="error-text">{fieldError}</div>}
           </div>
         );
 
       case 'user_picker': {
-        const pickerState = userPickerState[field.name] || defaultPickerState;
+        const pickerState = userPickerState[fieldKey] || defaultPickerState;
         return (
-          <div className="form-group" key={field.name}>
-            <label htmlFor={field.name}>
+          <div className="form-group" key={fieldKey}>
+            <label htmlFor={fieldKey}>
               {field.label} {field.required && <span style={{ color: '#de350b' }}>*</span>}
             </label>
             {pickerState.selectedUser ? (
@@ -213,16 +271,16 @@ function FormRenderer({ form, onBack, onSuccess }) {
                   <img src={pickerState.selectedUser.avatarUrl} alt="" className="user-avatar" width={24} height={24} />
                 )}
                 <span>{pickerState.selectedUser.displayName}</span>
-                <button className="clear-user" onClick={() => handleClearUser(field.name)} title="Clear selection">×</button>
+                <button className="clear-user" onClick={() => handleClearUser(fieldKey)} title="Clear selection">×</button>
               </div>
             ) : (
               <div className="user-picker">
                 <input
-                  id={field.name}
+                  id={fieldKey}
                   type="text"
                   value={pickerState.query}
-                  onChange={(e) => handleUserSearch(field.name, e.target.value)}
-                  onBlur={() => setTimeout(() => setUserPickerState((prev) => ({ ...prev, [field.name]: { ...prev[field.name], showDropdown: false } })), 200)}
+                  onChange={(e) => handleUserSearch(fieldKey, e.target.value)}
+                  onBlur={() => setTimeout(() => setUserPickerState((prev) => ({ ...prev, [fieldKey]: { ...prev[fieldKey], showDropdown: false } })), 200)}
                   placeholder="Search for a user or enter account ID..."
                   className={fieldError ? 'error' : ''}
                 />
@@ -232,7 +290,7 @@ function FormRenderer({ form, onBack, onSuccess }) {
                       <div
                         key={user.accountId}
                         className="user-picker-item"
-                        onMouseDown={(e) => { e.preventDefault(); handleSelectUser(field.name, user); }}
+                        onMouseDown={(e) => { e.preventDefault(); handleSelectUser(fieldKey, user); }}
                       >
                         {user.avatarUrl && (
                           <img src={user.avatarUrl} alt="" className="user-avatar" />
@@ -257,15 +315,15 @@ function FormRenderer({ form, onBack, onSuccess }) {
 
       default:
         return (
-          <div className="form-group" key={field.name}>
-            <label htmlFor={field.name}>
+          <div className="form-group" key={fieldKey}>
+            <label htmlFor={fieldKey}>
               {field.label} {field.required && <span style={{ color: '#de350b' }}>*</span>}
             </label>
             <input
-              id={field.name}
+              id={fieldKey}
               type={field.type === 'number' ? 'number' : field.type === 'email' ? 'email' : field.type === 'date' ? 'date' : 'text'}
               value={value}
-              onChange={(e) => handleFieldChange(field.name, e.target.value)}
+              onChange={(e) => handleFieldChange(fieldKey, e.target.value)}
               className={fieldError ? 'error' : ''}
             />
             {fieldError && <div className="error-text">{fieldError}</div>}
@@ -312,7 +370,11 @@ function FormRenderer({ form, onBack, onSuccess }) {
         </div>
       )}
 
-      {form.fields.map((field) => renderField(field))}
+      {/* Render standard fields + JSON-configured custom fields with conditional visibility */}
+      {allFields.map((field) => {
+        if (!isFieldVisible(field, fieldValues)) return null;
+        return renderField(field);
+      })}
 
       <div className="form-actions">
         <button
